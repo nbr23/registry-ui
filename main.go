@@ -33,8 +33,12 @@ func main() {
 	mux.HandleFunc("/api/v2/", handleRegistryProxy)
 	mux.HandleFunc("/", handleStatic)
 
-	log.Println("listening on :8080")
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("listening on :%s", port)
+	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
 
 func validateCredentials(username, password string) bool {

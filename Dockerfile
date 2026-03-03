@@ -8,5 +8,6 @@ RUN go build -o registry-ui .
 FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/registry-ui .
-EXPOSE 8080
+ENV PORT=8080
+EXPOSE ${PORT}
 CMD ["./registry-ui"]
