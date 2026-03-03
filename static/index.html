@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Registry</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+  --bg-0: #070b12;
+  --bg-1: #0d1219;
+  --bg-2: #141c28;
+  --bg-3: #1a2435;
+  --bg-hover: #1e2b40;
+  --border-1: #1b2537;
+  --border-2: #263350;
+  --text-1: #e8ecf4;
+  --text-2: #8e9bb5;
+  --text-3: #556178;
+  --amber: #e8a308;
+  --amber-bright: #ffc233;
+  --amber-dim: rgba(232, 163, 8, 0.10);
+  --amber-glow: rgba(232, 163, 8, 0.25);
+  --cyan: #2dd4bf;
+  --cyan-dim: rgba(45, 212, 191, 0.10);
+  --red: #f43f5e;
+  --red-dim: rgba(244, 63, 94, 0.10);
+  --green: #34d399;
+  --green-dim: rgba(52, 211, 153, 0.10);
+}
+
+html { height: 100%; }
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-0);
+  color: var(--text-1);
+  min-height: 100%;
+  line-height: 1.5;
+  background-image:
+    linear-gradient(rgba(27, 37, 55, 0.25) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27, 37, 55, 0.25) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+#app { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── Header ── */
+.app-header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border-1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.header-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 0 24px; height: 56px;
+  display: flex; align-items: center; gap: 16px;
+}
+.header-brand {
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer; text-decoration: none; color: inherit;
+}
+.header-logo {
+  width: 28px; height: 28px; border-radius: 2px;
+  background: var(--amber);
+  display: grid; place-items: center;
+}
+.header-logo svg { width: 16px; height: 16px; }
+.header-title {
+  font-family: var(--font-mono);
+  font-weight: 700; font-size: 0.95rem;
+  letter-spacing: 0.08em; color: var(--text-1);
+}
+.header-nav { flex: 1; display: flex; align-items: center; gap: 6px; margin-left: 8px; }
+.breadcrumb-sep { color: var(--text-3); font-size: 0.8rem; }
+.breadcrumb-link {
+  color: var(--text-2); text-decoration: none;
+  font-size: 0.85rem; font-weight: 500;
+  padding: 4px 8px; border-radius: 2px;
+  transition: color 0.15s, background 0.15s;
+}
+.breadcrumb-link:hover { color: var(--text-1); background: var(--bg-3); }
+.breadcrumb-current { color: var(--text-1); font-size: 0.85rem; font-weight: 600; padding: 4px 8px; }
+.header-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+/* ── Main ── */
+.main-content {
+  flex: 1; max-width: 1280px; width: 100%;
+  margin: 0 auto; padding: 32px 24px 64px;
+}
+
+/* ── Loading ── */
+.loading-bar {
+  position: fixed; top: 56px; left: 0; right: 0; height: 2px;
+  background: var(--bg-1); z-index: 200; overflow: hidden;
+}
+.loading-bar::after {
+  content: ''; position: absolute;
+  top: 0; left: -40%; width: 40%; height: 100%;
+  background: linear-gradient(90deg, transparent, var(--amber), transparent);
+  animation: scan 1s ease-in-out infinite;
+}
+@keyframes scan { to { left: 100%; } }
+
+.loading-skeleton {
+  display: flex; flex-direction: column; gap: 12px; padding: 24px 0;
+}
+.skel-row {
+  height: 44px; background: var(--bg-2); border-radius: 2px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.skel-row:nth-child(2) { animation-delay: 0.1s; opacity: 0.8; }
+.skel-row:nth-child(3) { animation-delay: 0.2s; opacity: 0.6; }
+.skel-row:nth-child(4) { animation-delay: 0.3s; opacity: 0.4; }
+@keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.7; } }
+
+/* ── Page sections ── */
+.page-header { margin-bottom: 24px; }
+.page-title {
+  font-size: 1.3rem; font-weight: 800; color: var(--text-1);
+  display: flex; align-items: center; gap: 10px;
+}
+.count-badge {
+  font-family: var(--font-mono);
+  font-size: 0.75rem; font-weight: 600;
+  padding: 2px 8px; background: var(--amber-dim);
+  color: var(--amber); border-radius: 2px;
+}
+.page-subtitle {
+  font-size: 0.85rem; color: var(--text-3); margin-top: 4px;
+}
+
+/* ── Filter ── */
+.filter-bar { margin-bottom: 20px; }
+.filter-input {
+  width: 100%; max-width: 360px; padding: 9px 12px 9px 36px;
+  background: var(--bg-2); border: 1px solid var(--border-1);
+  color: var(--text-1); font-family: var(--font-sans);
+  font-size: 0.85rem; border-radius: 2px;
+  outline: none; transition: border-color 0.15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23556178' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 10px center;
+}
+.filter-input:focus { border-color: var(--amber); }
+
+/* ── Tables ── */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th {
+  text-align: left; padding: 10px 14px;
+  font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-3); border-bottom: 1px solid var(--border-1);
+  background: var(--bg-1);
+  position: sticky; top: 56px; z-index: 10;
+}
+.data-table td {
+  padding: 12px 14px; font-size: 0.87rem;
+  border-bottom: 1px solid var(--border-1);
+  vertical-align: middle;
+}
+.data-table tbody tr {
+  transition: background 0.1s;
+  cursor: pointer;
+  animation: rowIn 0.25s ease forwards;
+  opacity: 0;
+}
+.data-table tbody tr:hover { background: var(--bg-hover); }
+.data-table tbody tr.no-click { cursor: default; }
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+.text-muted { color: var(--text-2); }
+.text-dim { color: var(--text-3); }
+
+/* ── Tags ── */
+.tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag-badge {
+  display: inline-block; padding: 2px 8px;
+  background: var(--cyan-dim); color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.75rem; font-weight: 500; border-radius: 2px;
+}
+.platform-badge {
+  display: inline-block; padding: 2px 8px;
+  background: var(--bg-3); color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 0.75rem; border-radius: 2px;
+}
+
+/* ── Buttons ── */
+.btn-sm {
+  padding: 5px 10px; font-size: 0.78rem; font-weight: 600;
+  font-family: var(--font-sans);
+  border: 1px solid var(--border-2); background: transparent;
+  color: var(--text-2); border-radius: 2px;
+  cursor: pointer; transition: all 0.15s;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.btn-sm:hover { color: var(--text-1); border-color: var(--text-3); background: var(--bg-3); }
+.btn-danger { color: var(--red); border-color: rgba(244,63,94,0.3); }
+.btn-danger:hover { background: var(--red-dim); color: var(--red); border-color: var(--red); }
+.btn-copy { padding: 4px 6px; border: none; background: transparent; color: var(--text-3); cursor: pointer; }
+.btn-copy:hover { color: var(--amber); }
+
+/* ── Detail page ── */
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.detail-card {
+  background: var(--bg-2); border: 1px solid var(--border-1);
+  padding: 18px 20px; border-radius: 2px;
+}
+.detail-card.full { grid-column: 1 / -1; }
+.detail-label {
+  font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-3); margin-bottom: 4px;
+}
+.detail-value { font-size: 0.9rem; color: var(--text-1); word-break: break-all; }
+.detail-value.mono { font-family: var(--font-mono); font-size: 0.82rem; }
+.detail-section { margin-top: 28px; }
+.detail-section-title {
+  font-size: 0.9rem; font-weight: 700; color: var(--text-1);
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.env-list { list-style: none; }
+.env-list li {
+  padding: 6px 10px; font-family: var(--font-mono);
+  font-size: 0.8rem; color: var(--text-2);
+  border-bottom: 1px solid var(--border-1);
+  word-break: break-all;
+}
+.env-list li:last-child { border-bottom: none; }
+
+/* ── Modal ── */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(7, 11, 18, 0.85);
+  backdrop-filter: blur(4px);
+  display: grid; place-items: center;
+  padding: 24px;
+  animation: fadeIn 0.15s ease;
+}
+.modal-card {
+  width: 100%; max-width: 420px;
+  background: var(--bg-2); border: 1px solid var(--border-2);
+  border-top: 2px solid var(--red);
+  padding: 28px 24px 24px;
+  animation: modalIn 0.2s ease;
+}
+.modal-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; }
+.modal-body { font-size: 0.87rem; color: var(--text-2); line-height: 1.6; margin-bottom: 20px; }
+.modal-body code {
+  font-family: var(--font-mono);
+  font-size: 0.8rem; padding: 1px 5px;
+  background: var(--bg-0); border-radius: 2px;
+}
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.btn-modal {
+  padding: 8px 18px; font-size: 0.85rem; font-weight: 600;
+  font-family: var(--font-sans);
+  border-radius: 2px; cursor: pointer;
+  transition: all 0.15s; border: 1px solid var(--border-2);
+}
+.btn-modal-cancel { background: transparent; color: var(--text-2); }
+.btn-modal-cancel:hover { background: var(--bg-3); color: var(--text-1); }
+.btn-modal-danger { background: var(--red); color: #fff; border-color: var(--red); }
+.btn-modal-danger:hover { background: #e11d48; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalIn { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
+
+/* ── Toast ── */
+.toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 600; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  padding: 10px 16px; background: var(--bg-3); border: 1px solid var(--border-2);
+  border-left: 3px solid var(--green); color: var(--text-1);
+  font-size: 0.85rem; border-radius: 2px;
+  animation: toastIn 0.2s ease, toastOut 0.3s ease 2.5s forwards;
+}
+.toast.error { border-left-color: var(--red); }
+@keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+@keyframes toastOut { to { opacity: 0; transform: translateX(20px); } }
+
+/* ── Empty state ── */
+.empty-state {
+  text-align: center; padding: 64px 24px;
+  color: var(--text-3);
+}
+.empty-state p { font-size: 0.95rem; margin-top: 8px; }
+
+/* ── Multi-arch sub-row ── */
+.sub-row td { padding-left: 40px; background: var(--bg-1); }
+.sub-row td:first-child::before {
+  content: ''; display: inline-block;
+  width: 16px; height: 1px; background: var(--border-2);
+  vertical-align: middle; margin-right: 8px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .detail-grid { grid-template-columns: 1fr; }
+  .data-table { font-size: 0.82rem; }
+  .data-table th, .data-table td { padding: 8px 10px; }
+  .header-inner { padding: 0 16px; }
+  .main-content { padding: 20px 16px 48px; }
+  .hide-mobile { display: none; }
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal-root"></div>
+<div class="toast-container" id="toasts"></div>
+
+<script>
+const app = document.getElementById('app');
+const modalRoot = document.getElementById('modal-root');
+const toasts = document.getElementById('toasts');
+
+// ── Utilities ──
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatBytes(b) {
+  if (b === 0) return '0 B';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(b) / Math.log(1024));
+  return (b / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + u[i];
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '\u2014';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return '\u2014';
+  const s = Math.floor((Date.now() - d) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  if (s < 2592000) return Math.floor(s / 86400) + 'd ago';
+  if (s < 31536000) return Math.floor(s / 2592000) + 'mo ago';
+  return Math.floor(s / 31536000) + 'y ago';
+}
+
+function shortDigest(d) {
+  return d ? d.replace('sha256:', '').substring(0, 12) : '\u2014';
+}
+
+function toast(msg, isError) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (isError ? ' error' : '');
+  el.textContent = msg;
+  toasts.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Copied to clipboard');
+  } catch { toast('Copy failed', true); }
+}
+
+// ── Semaphore ──
+
+class Semaphore {
+  constructor(max) { this.max = max; this.count = 0; this.queue = []; }
+  acquire() {
+    if (this.count < this.max) { this.count++; return Promise.resolve(); }
+    return new Promise(r => this.queue.push(r));
+  }
+  release() {
+    this.count--;
+    if (this.queue.length) { this.count++; this.queue.shift()(); }
+  }
+}
+
+const sem = new Semaphore(10);
+
+async function limited(fn) {
+  await sem.acquire();
+  try { return await fn(); } finally { sem.release(); }
+}
+
+// ── API ──
+
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  return fetch(path, opts);
+}
+
+async function fetchRepos() {
+  const repos = [];
+  let url = '/api/v2/_catalog';
+  while (url) {
+    const res = await api('GET', url);
+    const data = await res.json();
+    if (data.repositories) repos.push(...data.repositories);
+    const link = res.headers.get('Link');
+    if (link) {
+      const m = link.match(/<([^>]+)>;\s*rel="next"/);
+      url = m ? m[1] : null;
+    } else { url = null; }
+  }
+  return repos.sort();
+}
+
+async function fetchTags(name) {
+  const res = await api('GET', `/api/v2/${name}/tags/list`);
+  const data = await res.json();
+  return data.tags || [];
+}
+
+async function fetchManifest(name, ref) {
+  const res = await api('GET', `/api/v2/${name}/manifests/${ref}`);
+  const digest = res.headers.get('Docker-Content-Digest');
+  const manifest = await res.json();
+  return { digest, manifest };
+}
+
+async function headManifest(name, ref) {
+  const res = await api('HEAD', `/api/v2/${name}/manifests/${ref}`);
+  return res.headers.get('Docker-Content-Digest');
+}
+
+async function fetchConfig(name, configDigest) {
+  const res = await api('GET', `/api/v2/${name}/blobs/${configDigest}`);
+  return res.json();
+}
+
+async function deleteManifest(name, digest) {
+  return api('DELETE', `/api/v2/${name}/manifests/${digest}`);
+}
+
+// ── Router ──
+
+function navigate(path) {
+  history.pushState(null, '', path);
+  render();
+}
+
+window.addEventListener('popstate', render);
+
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[data-link]');
+  if (a) { e.preventDefault(); navigate(a.getAttribute('href')); }
+});
+
+function getRoute() {
+  const p = location.pathname;
+  const s = new URLSearchParams(location.search);
+  if (p === '/repos') return { view: 'repos' };
+  if (p === '/repo') return { view: 'repo', name: s.get('name') };
+  if (p === '/image') return { view: 'image', name: s.get('name'), digest: s.get('digest') };
+  return { view: 'repos' };
+}
+
+// ── Render ──
+
+async function render() {
+  const route = getRoute();
+  switch (route.view) {
+    case 'repos': return renderRepos();
+    case 'repo': return renderRepoDetail(route.name);
+    case 'image': return renderImageDetail(route.name, route.digest);
+    default: return renderRepos();
+  }
+}
+
+// ── Header ──
+
+function headerHTML(breadcrumbs) {
+  const crumbsHTML = breadcrumbs.map((c, i) => {
+    if (i === breadcrumbs.length - 1) return `<span class="breadcrumb-current">${esc(c.label)}</span>`;
+    return `<a href="${esc(c.href)}" data-link class="breadcrumb-link">${esc(c.label)}</a><span class="breadcrumb-sep">/</span>`;
+  }).join('');
+
+  return `<header class="app-header"><div class="header-inner">
+    <a href="/repos" data-link class="header-brand">
+      <div class="header-logo"><svg viewBox="0 0 16 16" fill="none" stroke="#080c14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="13" height="3.5"/><rect x="1.5" y="6.25" width="13" height="3.5"/><rect x="1.5" y="11" width="13" height="3.5"/></svg></div>
+      <span class="header-title">REGISTRY</span>
+    </a>
+    <nav class="header-nav">${crumbsHTML}</nav>
+    <div class="header-right"></div>
+  </div></header>`;
+}
+
+function pageShell(breadcrumbs, content) {
+  return headerHTML(breadcrumbs) + `<div class="main-content">${content}</div>`;
+}
+
+function loadingHTML() {
+  return `<div class="loading-bar"></div><div class="loading-skeleton">
+    <div class="skel-row"></div><div class="skel-row"></div>
+    <div class="skel-row"></div><div class="skel-row"></div></div>`;
+}
+
+// ── Repos View ──
+
+async function renderRepos() {
+  const crumbs = [{ label: 'Repositories' }];
+  app.innerHTML = pageShell(crumbs, loadingHTML());
+  try {
+    const repos = await fetchRepos();
+    let filtered = repos;
+    const content = `<div class="page-header">
+        <div class="page-title">Repositories <span class="count-badge" id="repo-count">${repos.length}</span></div>
+      </div>
+      <div class="filter-bar"><input class="filter-input" id="repo-filter" type="text" placeholder="Filter repositories..."></div>
+      <table class="data-table"><thead><tr>
+        <th>Repository</th>
+        <th class="hide-mobile">Path</th>
+      </tr></thead><tbody id="repo-tbody"></tbody></table>
+      ${repos.length === 0 ? '<div class="empty-state"><p>No repositories found.</p></div>' : ''}`;
+    app.innerHTML = pageShell(crumbs, content);
+
+    function renderRows(list) {
+      const tbody = document.getElementById('repo-tbody');
+      tbody.innerHTML = list.map((r, i) => {
+        const parts = r.split('/');
+        const name = parts[parts.length - 1];
+        const ns = parts.length > 1 ? parts.slice(0, -1).join('/') : '\u2014';
+        return `<tr style="animation-delay:${i * 30}ms" onclick="navigate('/repo?name=${encodeURIComponent(r)}')">
+          <td><strong>${esc(name)}</strong></td>
+          <td class="text-muted hide-mobile mono">${esc(r)}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('repo-count').textContent = list.length;
+    }
+
+    renderRows(repos);
+    document.getElementById('repo-filter').addEventListener('input', e => {
+      const q = e.target.value.toLowerCase();
+      filtered = repos.filter(r => r.toLowerCase().includes(q));
+      renderRows(filtered);
+    });
+  } catch (err) {
+    if (err.message !== 'unauthorized') {
+      app.innerHTML = pageShell(crumbs, `<div class="empty-state"><p>Failed to load repositories.</p></div>`);
+    }
+  }
+}
+
+// ── Repo Detail ──
+
+async function renderRepoDetail(name) {
+  const crumbs = [
+    { label: 'Repositories', href: '/repos' },
+    { label: name },
+  ];
+  app.innerHTML = pageShell(crumbs, loadingHTML());
+
+  try {
+    const tags = await fetchTags(name);
+    if (!tags || tags.length === 0) {
+      app.innerHTML = pageShell(crumbs, `<div class="page-header">
+        <div class="page-title">${esc(name)}</div>
+        <div class="page-subtitle">Image repository</div>
+      </div><div class="empty-state"><p>No tags found in this repository.</p></div>`);
+      return;
+    }
+
+    // Resolve tag→digest
+    const tagDigests = await Promise.all(tags.map(tag =>
+      limited(async () => {
+        try {
+          const digest = await headManifest(name, tag);
+          return { tag, digest };
+        } catch { return { tag, digest: null }; }
+      })
+    ));
+
+    // Group by digest
+    const groups = {};
+    for (const { tag, digest } of tagDigests) {
+      if (!digest) continue;
+      if (!groups[digest]) groups[digest] = { digest, tags: [] };
+      groups[digest].tags.push(tag);
+    }
+
+    // Fetch manifests + config for each unique digest
+    const images = await Promise.all(Object.values(groups).map(g =>
+      limited(async () => {
+        try {
+          const { manifest } = await fetchManifest(name, g.digest);
+          const info = { ...g, manifest, size: 0, created: null, platform: null, isManifestList: false, isV1: false, platforms: [] };
+
+          if (manifest.manifests) {
+            info.isManifestList = true;
+            info.platforms = manifest.manifests.map(m => ({
+              digest: m.digest,
+              platform: m.platform ? `${m.platform.os}/${m.platform.architecture}${m.platform.variant ? '/' + m.platform.variant : ''}` : 'unknown',
+              size: m.size || 0,
+            }));
+          } else if (manifest.schemaVersion === 1 || manifest.fsLayers) {
+            info.isV1 = true;
+          } else if (manifest.config) {
+            info.size = (manifest.layers || []).reduce((s, l) => s + (l.size || 0), 0);
+            try {
+              const config = await fetchConfig(name, manifest.config.digest);
+              info.created = config.created;
+              info.platform = (config.os || '') + '/' + (config.architecture || '');
+            } catch {}
+          }
+          return info;
+        } catch { return { ...g, manifest: null, size: 0, created: null, platform: null }; }
+      })
+    ));
+
+    images.sort((a, b) => {
+      if (a.created && b.created) return new Date(b.created) - new Date(a.created);
+      if (a.created) return -1;
+      if (b.created) return 1;
+      return 0;
+    });
+
+    let rows = '';
+    for (const img of images) {
+      const tagsHTML = img.tags.map(t => `<span class="tag-badge">${esc(t)}</span>`).join('');
+      const digestShort = shortDigest(img.digest);
+
+      if (img.isManifestList) {
+        rows += `<tr onclick="navigate('/image?name=${encodeURIComponent(name)}&digest=${encodeURIComponent(img.digest)}')">
+          <td><div class="tag-list">${tagsHTML}</div></td>
+          <td class="mono text-muted">${digestShort}</td>
+          <td class="hide-mobile">\u2014</td>
+          <td class="hide-mobile">\u2014</td>
+          <td><span class="platform-badge">multi-arch (${img.platforms.length})</span></td>
+          <td><button class="btn-sm btn-danger" onclick="event.stopPropagation();confirmDelete('${esc(name)}','${esc(img.digest)}')">Delete</button></td>
+        </tr>`;
+        for (const p of img.platforms) {
+          rows += `<tr class="sub-row" onclick="navigate('/image?name=${encodeURIComponent(name)}&digest=${encodeURIComponent(p.digest)}')">
+            <td></td>
+            <td class="mono text-muted">${shortDigest(p.digest)}</td>
+            <td class="hide-mobile">${p.size ? formatBytes(p.size) : '\u2014'}</td>
+            <td class="hide-mobile">\u2014</td>
+            <td><span class="platform-badge">${esc(p.platform)}</span></td>
+            <td></td>
+          </tr>`;
+        }
+      } else if (img.isV1) {
+        rows += `<tr class="no-click">
+          <td><div class="tag-list">${tagsHTML}</div></td>
+          <td class="mono text-muted">${digestShort}</td>
+          <td class="hide-mobile">\u2014</td>
+          <td class="hide-mobile">\u2014</td>
+          <td class="text-dim">legacy v1</td>
+          <td><button class="btn-sm btn-danger" onclick="event.stopPropagation();confirmDelete('${esc(name)}','${esc(img.digest)}')">Delete</button></td>
+        </tr>`;
+      } else {
+        rows += `<tr onclick="navigate('/image?name=${encodeURIComponent(name)}&digest=${encodeURIComponent(img.digest)}')">
+          <td><div class="tag-list">${tagsHTML}</div></td>
+          <td class="mono text-muted">${digestShort}</td>
+          <td class="mono hide-mobile">${img.size ? formatBytes(img.size) : '\u2014'}</td>
+          <td class="hide-mobile">${timeAgo(img.created)}</td>
+          <td>${img.platform ? `<span class="platform-badge">${esc(img.platform)}</span>` : '\u2014'}</td>
+          <td><button class="btn-sm btn-danger" onclick="event.stopPropagation();confirmDelete('${esc(name)}','${esc(img.digest)}')">Delete</button></td>
+        </tr>`;
+      }
+    }
+
+    const content = `<div class="page-header">
+        <div class="page-title">${esc(name)} <span class="count-badge">${tags.length} tag${tags.length !== 1 ? 's' : ''}</span></div>
+        <div class="page-subtitle">${Object.keys(groups).length} unique image${Object.keys(groups).length !== 1 ? 's' : ''}</div>
+      </div>
+      <table class="data-table"><thead><tr>
+        <th>Tags</th><th>Digest</th><th class="hide-mobile">Size</th>
+        <th class="hide-mobile">Created</th><th>Platform</th><th>Actions</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+
+    app.innerHTML = pageShell(crumbs, content);
+  } catch (err) {
+    if (err.message !== 'unauthorized') {
+      app.innerHTML = pageShell(crumbs, `<div class="empty-state"><p>Failed to load repository details.</p></div>`);
+    }
+  }
+}
+
+// ── Image Detail ──
+
+async function renderImageDetail(name, digest) {
+  const crumbs = [
+    { label: 'Repositories', href: '/repos' },
+    { label: name, href: `/repo?name=${encodeURIComponent(name)}` },
+    { label: shortDigest(digest) },
+  ];
+  app.innerHTML = pageShell(crumbs, loadingHTML());
+
+  try {
+    const { manifest } = await fetchManifest(name, digest);
+    const isManifestList = !!manifest.manifests;
+    const isV1 = manifest.schemaVersion === 1 || !!manifest.fsLayers;
+
+    let config = null;
+    let totalSize = 0;
+    let layers = [];
+
+    if (isManifestList) {
+      // Manifest list / OCI index
+      const platformRows = manifest.manifests.map((m, i) => {
+        const p = m.platform || {};
+        const plat = `${p.os || '?'}/${p.architecture || '?'}${p.variant ? '/' + p.variant : ''}`;
+        return `<tr onclick="navigate('/image?name=${encodeURIComponent(name)}&digest=${encodeURIComponent(m.digest)}')">
+          <td>${i + 1}</td>
+          <td><span class="platform-badge">${esc(plat)}</span></td>
+          <td class="mono text-muted">${shortDigest(m.digest)}</td>
+          <td class="mono">${m.size ? formatBytes(m.size) : '\u2014'}</td>
+        </tr>`;
+      }).join('');
+
+      const content = `<div class="page-header">
+          <div class="page-title">Manifest List</div>
+          <div class="page-subtitle">${manifest.manifests.length} platform${manifest.manifests.length !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-card full">
+            <div class="detail-label">Digest</div>
+            <div class="detail-value mono">${esc(digest)} <button class="btn-copy" onclick="copyText('${esc(digest)}')" title="Copy">&#x2398;</button></div>
+          </div>
+          <div class="detail-card full">
+            <div class="detail-label">Media Type</div>
+            <div class="detail-value mono">${esc(manifest.mediaType || 'unknown')}</div>
+          </div>
+        </div>
+        <div class="detail-section">
+          <div class="detail-section-title">Platforms</div>
+          <table class="data-table"><thead><tr>
+            <th>#</th><th>Platform</th><th>Digest</th><th>Size</th>
+          </tr></thead><tbody>${platformRows}</tbody></table>
+        </div>
+        <div style="margin-top:24px">
+          <button class="btn-sm btn-danger" onclick="confirmDelete('${esc(name)}','${esc(digest)}')">Delete Manifest List</button>
+        </div>`;
+      app.innerHTML = pageShell(crumbs, content);
+      return;
+    }
+
+    if (!isV1 && manifest.config) {
+      layers = manifest.layers || [];
+      totalSize = layers.reduce((s, l) => s + (l.size || 0), 0);
+      try { config = await fetchConfig(name, manifest.config.digest); } catch {}
+    }
+
+    // Find tags pointing to this digest
+    let tagsForDigest = [];
+    try {
+      const allTags = await fetchTags(name);
+      const checks = await Promise.all(allTags.map(tag =>
+        limited(async () => {
+          try {
+            const d = await headManifest(name, tag);
+            return d === digest ? tag : null;
+          } catch { return null; }
+        })
+      ));
+      tagsForDigest = checks.filter(Boolean);
+    } catch {}
+
+    const tagsHTML = tagsForDigest.length
+      ? tagsForDigest.map(t => `<span class="tag-badge">${esc(t)}</span>`).join(' ')
+      : '<span class="text-dim">untagged</span>';
+
+    let configHTML = '';
+    if (config) {
+      const c = config.config || {};
+      const entries = [
+        ['Created', config.created ? new Date(config.created).toUTCString() : null],
+        ['Architecture', config.architecture],
+        ['OS', config.os],
+        ['Cmd', c.Cmd ? c.Cmd.join(' ') : null],
+        ['Entrypoint', c.Entrypoint ? c.Entrypoint.join(' ') : null],
+        ['Exposed Ports', c.ExposedPorts ? Object.keys(c.ExposedPorts).join(', ') : null],
+      ].filter(e => e[1]);
+
+      const cardsHTML = entries.map(([label, val]) =>
+        `<div class="detail-card"><div class="detail-label">${esc(label)}</div><div class="detail-value mono">${esc(val)}</div></div>`
+      ).join('');
+
+      let envHTML = '';
+      if (c.Env && c.Env.length) {
+        envHTML = `<div class="detail-section">
+          <div class="detail-section-title">Environment</div>
+          <div class="detail-card full"><ul class="env-list">${c.Env.map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>
+        </div>`;
+      }
+
+      configHTML = `<div class="detail-section">
+        <div class="detail-section-title">Configuration</div>
+        <div class="detail-grid">${cardsHTML}</div>
+      </div>${envHTML}`;
+    } else if (isV1) {
+      configHTML = `<div class="detail-section"><div class="detail-card full"><div class="detail-label">Format</div><div class="detail-value">Legacy Schema v1 manifest. Limited metadata available.</div></div></div>`;
+    }
+
+    const layerRows = layers.map((l, i) =>
+      `<tr class="no-click">
+        <td>${i + 1}</td>
+        <td class="mono text-muted">${shortDigest(l.digest)}</td>
+        <td class="mono">${formatBytes(l.size || 0)}</td>
+        <td><a href="/api/v2/${encodeURIComponent(name)}/blobs/${l.digest}" class="btn-sm" download>Download</a></td>
+      </tr>`
+    ).join('');
+
+    const content = `<div class="page-header">
+        <div class="page-title">Image Detail</div>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-card full">
+          <div class="detail-label">Digest</div>
+          <div class="detail-value mono">${esc(digest)} <button class="btn-copy" onclick="copyText('${esc(digest)}')" title="Copy">&#x2398;</button></div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-label">Tags</div>
+          <div class="detail-value"><div class="tag-list">${tagsHTML}</div></div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-label">Total Size</div>
+          <div class="detail-value mono">${formatBytes(totalSize)}</div>
+        </div>
+      </div>
+      ${configHTML}
+      ${layers.length ? `<div class="detail-section">
+        <div class="detail-section-title">Layers <span class="count-badge">${layers.length}</span></div>
+        <table class="data-table"><thead><tr>
+          <th>#</th><th>Digest</th><th>Size</th><th>Actions</th>
+        </tr></thead><tbody>${layerRows}</tbody></table>
+      </div>` : ''}
+      <div style="margin-top:24px">
+        <button class="btn-sm btn-danger" onclick="confirmDelete('${esc(name)}','${esc(digest)}')">Delete Image</button>
+      </div>`;
+
+    app.innerHTML = pageShell(crumbs, content);
+  } catch (err) {
+    if (err.message !== 'unauthorized') {
+      app.innerHTML = pageShell(crumbs, `<div class="empty-state"><p>Failed to load image details.</p></div>`);
+    }
+  }
+}
+
+// ── Delete ──
+
+function confirmDelete(name, digest) {
+  modalRoot.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+    <div class="modal-card">
+      <div class="modal-title">Delete Image</div>
+      <div class="modal-body">
+        <p>This will delete the manifest <code>${shortDigest(digest)}</code> from <strong>${esc(name)}</strong>.</p>
+        <p style="margin-top:10px">After deletion, run <code>registry garbage-collect</code> to reclaim disk space.</p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-modal btn-modal-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-modal btn-modal-danger" id="confirm-delete-btn" onclick="doDelete('${esc(name)}','${esc(digest)}')">Delete</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function doDelete(name, digest) {
+  const btn = document.getElementById('confirm-delete-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Deleting...'; }
+  try {
+    const res = await deleteManifest(name, digest);
+    closeModal();
+    if (res.status === 202 || res.status === 200) {
+      toast('Image deleted successfully');
+      navigate(`/repo?name=${encodeURIComponent(name)}`);
+    } else {
+      toast('Delete failed: ' + res.status, true);
+    }
+  } catch (err) {
+    closeModal();
+    toast('Delete failed', true);
+  }
+}
+
+function closeModal() { modalRoot.innerHTML = ''; }
+
+// ── Init ──
+
+render();
+</script>
+</body>
+</html>
