@@ -1,6 +1,6 @@
 # registry-ui
 
-A minimal web UI for docker [`registry`](https://hub.docker.com/_/registry) Docker registry.
+A minimal web UI for docker [`registry`](https://hub.docker.com/_/registry).
 
 ## Running with Docker Compose
 
