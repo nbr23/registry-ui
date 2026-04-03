@@ -445,6 +445,17 @@ async function deleteManifest(name, digest) {
   return api('DELETE', `/api/v2/${name}/manifests/${digest}`);
 }
 
+let _pullHost = null;
+async function getPullHost() {
+  if (_pullHost !== null) return _pullHost;
+  try {
+    const res = await api('GET', '/api/info');
+    const data = await res.json();
+    _pullHost = data.pullHost || '';
+  } catch { _pullHost = ''; }
+  return _pullHost;
+}
+
 // ── Router ──
 
 function navigate(path) {
@@ -700,6 +711,7 @@ async function renderImageDetail(name, digest) {
   app.innerHTML = pageShell(crumbs, loadingHTML());
 
   try {
+    const host = await getPullHost();
     const { manifest } = await fetchManifest(name, digest);
     const isManifestList = !!manifest.manifests;
     const isV1 = manifest.schemaVersion === 1 || !!manifest.fsLayers;
@@ -721,6 +733,11 @@ async function renderImageDetail(name, digest) {
         </tr>`;
       }).join('');
 
+      const mlDigestCmd = `docker pull ${host}/${name}@${digest}`;
+      const mlPullCard = host ? `<div class="detail-card full">
+          <div class="detail-label">Pull Command</div>
+          <div class="detail-value mono">${esc(mlDigestCmd)} <button class="btn-copy" onclick="copyText('${esc(mlDigestCmd)}')" title="Copy">&#x2398;</button></div>
+        </div>` : '';
       const content = `<div class="page-header">
           <div class="page-title">Manifest List</div>
           <div class="page-subtitle">${manifest.manifests.length} platform${manifest.manifests.length !== 1 ? 's' : ''}</div>
@@ -730,6 +747,7 @@ async function renderImageDetail(name, digest) {
             <div class="detail-label">Digest</div>
             <div class="detail-value mono">${esc(digest)} <button class="btn-copy" onclick="copyText('${esc(digest)}')" title="Copy">&#x2398;</button></div>
           </div>
+          ${mlPullCard}
           <div class="detail-card full">
             <div class="detail-label">Media Type</div>
             <div class="detail-value mono">${esc(manifest.mediaType || 'unknown')}</div>
@@ -814,6 +832,17 @@ async function renderImageDetail(name, digest) {
       </tr>`
     ).join('');
 
+    const tagCmds = host ? tagsForDigest.map(t => {
+      const cmd = `docker pull ${host}/${name}:${t}`;
+      return `<div class="detail-value mono">${esc(cmd)} <button class="btn-copy" onclick="copyText('${esc(cmd)}')" title="Copy">&#x2398;</button></div>`;
+    }).join('') : '';
+    const digestCmd = `docker pull ${host}/${name}@${digest}`;
+    const pullCard = host ? `<div class="detail-card full">
+        <div class="detail-label">Pull Command</div>
+        ${tagCmds}
+        <div class="detail-value mono">${esc(digestCmd)} <button class="btn-copy" onclick="copyText('${esc(digestCmd)}')" title="Copy">&#x2398;</button></div>
+      </div>` : '';
+
     const content = `<div class="page-header">
         <div class="page-title">Image Detail</div>
       </div>
@@ -822,6 +851,7 @@ async function renderImageDetail(name, digest) {
           <div class="detail-label">Digest</div>
           <div class="detail-value mono">${esc(digest)} <button class="btn-copy" onclick="copyText('${esc(digest)}')" title="Copy">&#x2398;</button></div>
         </div>
+        ${pullCard}
         <div class="detail-card">
           <div class="detail-label">Tags</div>
           <div class="detail-value"><div class="tag-list">${tagsHTML}</div></div>

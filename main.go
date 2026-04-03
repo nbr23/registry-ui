@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"io"
 	"log"
 	"mime"
@@ -17,6 +18,7 @@ import (
 var staticFiles embed.FS
 
 var registryURL *url.URL
+var pullHost string
 
 func main() {
 	raw := os.Getenv("REGISTRY_URL")
@@ -29,7 +31,13 @@ func main() {
 		log.Fatalf("invalid REGISTRY_URL: %v", err)
 	}
 
+	pullHost = os.Getenv("PULL_HOST")
+	if pullHost == "" {
+		pullHost = registryURL.Host
+	}
+
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/info", handleInfo)
 	mux.HandleFunc("/api/v2/", handleRegistryProxy)
 	mux.HandleFunc("/", handleStatic)
 
@@ -53,6 +61,17 @@ func validateCredentials(username, password string) bool {
 	}
 	resp.Body.Close()
 	return resp.StatusCode == http.StatusOK
+}
+
+func handleInfo(w http.ResponseWriter, r *http.Request) {
+	username, password, ok := r.BasicAuth()
+	if !ok || !validateCredentials(username, password) {
+		w.Header().Set("WWW-Authenticate", `Basic realm="Docker Registry"`)
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"pullHost":%q}`, pullHost)
 }
 
 func handleRegistryProxy(w http.ResponseWriter, r *http.Request) {
