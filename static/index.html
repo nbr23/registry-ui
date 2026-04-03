@@ -751,9 +751,28 @@ async function renderImageDetail(name, digest) {
         </tr>`;
       }).join('');
 
+      let mlTagsForDigest = [];
+      try {
+        const allTags = await fetchTags(name);
+        const checks = await Promise.all(allTags.map(tag =>
+          limited(async () => {
+            try {
+              const d = await headManifest(name, tag);
+              return d === digest ? tag : null;
+            } catch { return null; }
+          })
+        ));
+        mlTagsForDigest = checks.filter(Boolean);
+      } catch {}
+
       const mlDigestCmd = `docker pull ${host}/${name}@${digest}`;
+      const mlTagCmds = host ? mlTagsForDigest.map(t => {
+        const cmd = `docker pull ${host}/${name}:${t}`;
+        return `<div class="detail-value mono">${esc(cmd)} <button class="btn-copy" onclick="copyText('${esc(cmd)}')" title="Copy">&#x2398;</button></div>`;
+      }).join('') : '';
       const mlPullCard = host ? `<div class="detail-card full">
           <div class="detail-label">Pull Command</div>
+          ${mlTagCmds}
           <div class="detail-value mono">${esc(mlDigestCmd)} <button class="btn-copy" onclick="copyText('${esc(mlDigestCmd)}')" title="Copy">&#x2398;</button></div>
         </div>` : '';
       const content = `<div class="page-header">
