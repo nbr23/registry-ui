@@ -87,6 +87,15 @@ body {
 .breadcrumb-link:hover { color: var(--text-1); background: var(--bg-3); }
 .breadcrumb-current { color: var(--text-1); font-size: 0.85rem; font-weight: 600; padding: 4px 8px; }
 .header-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.build-sha {
+  font-family: var(--font-mono);
+  font-size: 0.72rem; color: var(--text-3);
+  padding: 2px 6px;
+  background: var(--bg-2); border: 1px solid var(--border-1);
+  border-radius: 2px; cursor: default; letter-spacing: 0.05em;
+  transition: color 0.15s, border-color 0.15s;
+}
+.build-sha:hover { color: var(--text-2); border-color: var(--border-2); }
 /* ── Main ── */
 .main-content {
   flex: 1; max-width: 1280px; width: 100%;
@@ -445,15 +454,19 @@ async function deleteManifest(name, digest) {
   return api('DELETE', `/api/v2/${name}/manifests/${digest}`);
 }
 
-let _pullHost = null;
-async function getPullHost() {
-  if (_pullHost !== null) return _pullHost;
+let _appInfo = null;
+async function getAppInfo() {
+  if (_appInfo !== null) return _appInfo;
   try {
     const res = await api('GET', '/api/info');
     const data = await res.json();
-    _pullHost = data.pullHost || '';
-  } catch { _pullHost = ''; }
-  return _pullHost;
+    _appInfo = { pullHost: data.pullHost || '', gitSHA: data.gitSHA || '', buildDate: data.buildDate || '' };
+  } catch { _appInfo = { pullHost: '', gitSHA: '', buildDate: '' }; }
+  return _appInfo;
+}
+
+async function getPullHost() {
+  return (await getAppInfo()).pullHost;
 }
 
 // ── Router ──
@@ -482,6 +495,7 @@ function getRoute() {
 // ── Render ──
 
 async function render() {
+  await getAppInfo();
   const route = getRoute();
   switch (route.view) {
     case 'repos': return renderRepos();
@@ -499,13 +513,17 @@ function headerHTML(breadcrumbs) {
     return `<a href="${esc(c.href)}" data-link class="breadcrumb-link">${esc(c.label)}</a><span class="breadcrumb-sep">/</span>`;
   }).join('');
 
+  const shaHTML = (_appInfo && _appInfo.gitSHA)
+    ? `<span class="build-sha" title="${esc(_appInfo.buildDate)}">build: ${esc(_appInfo.gitSHA)}</span>`
+    : '';
+
   return `<header class="app-header"><div class="header-inner">
     <a href="/repos" data-link class="header-brand">
       <div class="header-logo"><svg viewBox="0 0 16 16" fill="none" stroke="#080c14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="13" height="3.5"/><rect x="1.5" y="6.25" width="13" height="3.5"/><rect x="1.5" y="11" width="13" height="3.5"/></svg></div>
       <span class="header-title">REGISTRY</span>
     </a>
     <nav class="header-nav">${crumbsHTML}</nav>
-    <div class="header-right"></div>
+    <div class="header-right">${shaHTML}</div>
   </div></header>`;
 }
 

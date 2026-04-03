@@ -1,10 +1,14 @@
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 ARG TARGETOS TARGETARCH
+ARG GIT_SHA=""
+ARG BUILD_DATE=""
 WORKDIR /app
 COPY go.mod .
 COPY main.go .
 COPY static ./static
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o registry-ui .
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
+    -ldflags "-X main.gitSHA=${GIT_SHA} -X main.buildDate=${BUILD_DATE}" \
+    -o registry-ui .
 
 FROM alpine:latest
 WORKDIR /app

@@ -28,6 +28,8 @@ pipeline {
                         --pull \
                         --builder \$BUILDX_BUILDER  \
                         --platform linux/arm64,linux/amd64 \
+                        --build-arg GIT_SHA=`git rev-parse --short HEAD` \
+                        --build-arg BUILD_DATE=`git log -1 --format=%cI` \
                         -t nbr23/registry-ui:latest \
                         -t nbr23/registry-ui:`git rev-parse --short HEAD` \
                         ${ "$GIT_BRANCH" == "master" ? "--push" : ""} .

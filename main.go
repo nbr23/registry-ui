@@ -19,6 +19,8 @@ var staticFiles embed.FS
 
 var registryURL *url.URL
 var pullHost string
+var gitSHA = ""
+var buildDate = ""
 
 func main() {
 	raw := os.Getenv("REGISTRY_URL")
@@ -71,7 +73,7 @@ func handleInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"pullHost":%q}`, pullHost)
+	fmt.Fprintf(w, `{"pullHost":%q,"gitSHA":%q,"buildDate":%q}`, pullHost, gitSHA, buildDate)
 }
 
 func handleRegistryProxy(w http.ResponseWriter, r *http.Request) {
