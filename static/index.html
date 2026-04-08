@@ -443,7 +443,7 @@ async function fetchManifest(name, ref) {
 
 async function headManifest(name, ref) {
   const res = await api('HEAD', `/api/v2/${name}/manifests/${ref}`);
-  return res.headers.get('Docker-Content-Digest');
+  return { digest: res.headers.get('Docker-Content-Digest'), pushed: res.headers.get('Last-Modified') };
 }
 
 async function fetchConfig(name, configDigest) {
@@ -607,26 +607,29 @@ async function renderRepoDetail(name) {
     const tagDigests = await Promise.all(tags.map(tag =>
       limited(async () => {
         try {
-          const digest = await headManifest(name, tag);
-          return { tag, digest };
-        } catch { return { tag, digest: null }; }
+          const { digest, pushed } = await headManifest(name, tag);
+          return { tag, digest, pushed };
+        } catch { return { tag, digest: null, pushed: null }; }
       })
     ));
 
-    // Group by digest
+    // Group by digest, keeping the most recent push time across all tags
     const groups = {};
-    for (const { tag, digest } of tagDigests) {
+    for (const { tag, digest, pushed } of tagDigests) {
       if (!digest) continue;
-      if (!groups[digest]) groups[digest] = { digest, tags: [] };
+      if (!groups[digest]) groups[digest] = { digest, tags: [], pushed: null };
       groups[digest].tags.push(tag);
+      if (pushed && (!groups[digest].pushed || new Date(pushed) > new Date(groups[digest].pushed))) {
+        groups[digest].pushed = pushed;
+      }
     }
 
     // Fetch manifests + config for each unique digest
     const images = await Promise.all(Object.values(groups).map(g =>
       limited(async () => {
         try {
-          const { manifest, pushed } = await fetchManifest(name, g.digest);
-          const info = { ...g, manifest, size: 0, created: null, pushed: pushed || null, platform: null, isManifestList: false, isV1: false, platforms: [] };
+          const { manifest, pushed: manifestPushed } = await fetchManifest(name, g.digest);
+          const info = { ...g, manifest, size: 0, created: null, pushed: g.pushed || manifestPushed || null, platform: null, isManifestList: false, isV1: false, platforms: [] };
 
           if (manifest.manifests) {
             info.isManifestList = true;
@@ -635,6 +638,19 @@ async function renderRepoDetail(name) {
               platform: m.platform ? `${m.platform.os}/${m.platform.architecture}${m.platform.variant ? '/' + m.platform.variant : ''}` : 'unknown',
               size: m.size || 0,
             }));
+            if (!info.pushed) {
+              const first = manifest.manifests.find(m => m.platform && m.platform.os !== 'unknown' && m.platform.architecture !== 'unknown');
+              const firstDigest = (first || manifest.manifests[0])?.digest;
+              if (firstDigest) {
+                try {
+                  const { manifest: pm } = await fetchManifest(name, firstDigest);
+                  if (pm.config) {
+                    const cfg = await fetchConfig(name, pm.config.digest);
+                    info.created = cfg.created;
+                  }
+                } catch {}
+              }
+            }
           } else if (manifest.schemaVersion === 1 || manifest.fsLayers) {
             info.isV1 = true;
           } else if (manifest.config) {
@@ -668,7 +684,7 @@ async function renderRepoDetail(name) {
           <td><div class="tag-list">${tagsHTML}</div></td>
           <td class="mono text-muted">${digestShort}</td>
           <td class="hide-mobile">\u2014</td>
-          <td class="hide-mobile">${timeAgo(img.pushed)}</td>
+          <td class="hide-mobile">${timeAgo(img.pushed || img.created)}</td>
           <td><span class="platform-badge">multi-arch (${img.platforms.length})</span></td>
           <td><button class="btn-sm btn-danger" onclick="event.stopPropagation();confirmDelete('${esc(name)}','${esc(img.digest)}')">Delete</button></td>
         </tr>`;
@@ -759,7 +775,7 @@ async function renderImageDetail(name, digest) {
         const checks = await Promise.all(allTags.map(tag =>
           limited(async () => {
             try {
-              const d = await headManifest(name, tag);
+              const { digest: d } = await headManifest(name, tag);
               return d === digest ? tag : null;
             } catch { return null; }
           })
@@ -822,7 +838,7 @@ async function renderImageDetail(name, digest) {
       const checks = await Promise.all(allTags.map(tag =>
         limited(async () => {
           try {
-            const d = await headManifest(name, tag);
+            const { digest: d } = await headManifest(name, tag);
             return d === digest ? tag : null;
           } catch { return null; }
         })
