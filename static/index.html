@@ -206,6 +206,10 @@ body {
   font-family: var(--font-mono);
   font-size: 0.75rem; border-radius: 2px;
 }
+.attestation-badge {
+  background: var(--amber-dim); color: var(--amber);
+  opacity: 0.7;
+}
 
 /* ── Buttons ── */
 .btn-sm {
@@ -637,6 +641,7 @@ async function renderRepoDetail(name) {
               digest: m.digest,
               platform: m.platform ? `${m.platform.os}/${m.platform.architecture}${m.platform.variant ? '/' + m.platform.variant : ''}` : 'unknown',
               size: m.size || 0,
+              attestation: m.annotations?.['vnd.docker.reference.type'] === 'attestation-manifest',
             }));
             if (!info.pushed) {
               const first = manifest.manifests.find(m => m.platform && m.platform.os !== 'unknown' && m.platform.architecture !== 'unknown');
@@ -689,12 +694,15 @@ async function renderRepoDetail(name) {
           <td><button class="btn-sm btn-danger" onclick="event.stopPropagation();confirmDelete('${esc(name)}','${esc(img.digest)}')">Delete</button></td>
         </tr>`;
         for (const p of img.platforms) {
+          const platBadge = p.attestation
+            ? `<span class="platform-badge attestation-badge">attestation</span>`
+            : `<span class="platform-badge">${esc(p.platform)}</span>`;
           rows += `<tr class="sub-row" onclick="navigate('/image?name=${encodeURIComponent(name)}&digest=${encodeURIComponent(p.digest)}')">
             <td></td>
             <td class="mono text-muted">${shortDigest(p.digest)}</td>
             <td class="hide-mobile">${p.size ? formatBytes(p.size) : '\u2014'}</td>
             <td class="hide-mobile">\u2014</td>
-            <td><span class="platform-badge">${esc(p.platform)}</span></td>
+            <td>${platBadge}</td>
             <td></td>
           </tr>`;
         }
