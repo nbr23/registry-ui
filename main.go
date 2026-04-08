@@ -129,7 +129,7 @@ func handleRegistryProxy(w http.ResponseWriter, r *http.Request) {
 	for _, h := range []string{
 		"Content-Type", "Content-Length", "Docker-Content-Digest",
 		"Link", "Docker-Distribution-Api-Version",
-		"Location", "Www-Authenticate",
+		"Location", "Www-Authenticate", "Last-Modified",
 	} {
 		if v := resp.Header.Get(h); v != "" {
 			w.Header().Set(h, v)

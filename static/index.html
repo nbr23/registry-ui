@@ -436,8 +436,9 @@ async function fetchTags(name) {
 async function fetchManifest(name, ref) {
   const res = await api('GET', `/api/v2/${name}/manifests/${ref}`);
   const digest = res.headers.get('Docker-Content-Digest');
+  const pushed = res.headers.get('Last-Modified');
   const manifest = await res.json();
-  return { digest, manifest };
+  return { digest, manifest, pushed };
 }
 
 async function headManifest(name, ref) {
@@ -624,8 +625,8 @@ async function renderRepoDetail(name) {
     const images = await Promise.all(Object.values(groups).map(g =>
       limited(async () => {
         try {
-          const { manifest } = await fetchManifest(name, g.digest);
-          const info = { ...g, manifest, size: 0, created: null, platform: null, isManifestList: false, isV1: false, platforms: [] };
+          const { manifest, pushed } = await fetchManifest(name, g.digest);
+          const info = { ...g, manifest, size: 0, created: null, pushed: pushed || null, platform: null, isManifestList: false, isV1: false, platforms: [] };
 
           if (manifest.manifests) {
             info.isManifestList = true;
@@ -650,9 +651,10 @@ async function renderRepoDetail(name) {
     ));
 
     images.sort((a, b) => {
-      if (a.created && b.created) return new Date(b.created) - new Date(a.created);
-      if (a.created) return -1;
-      if (b.created) return 1;
+      const at = a.pushed || a.created, bt = b.pushed || b.created;
+      if (at && bt) return new Date(bt) - new Date(at);
+      if (at) return -1;
+      if (bt) return 1;
       return 0;
     });
 
@@ -666,7 +668,7 @@ async function renderRepoDetail(name) {
           <td><div class="tag-list">${tagsHTML}</div></td>
           <td class="mono text-muted">${digestShort}</td>
           <td class="hide-mobile">\u2014</td>
-          <td class="hide-mobile">\u2014</td>
+          <td class="hide-mobile">${timeAgo(img.pushed)}</td>
           <td><span class="platform-badge">multi-arch (${img.platforms.length})</span></td>
           <td><button class="btn-sm btn-danger" onclick="event.stopPropagation();confirmDelete('${esc(name)}','${esc(img.digest)}')">Delete</button></td>
         </tr>`;
@@ -694,7 +696,7 @@ async function renderRepoDetail(name) {
           <td><div class="tag-list">${tagsHTML}</div></td>
           <td class="mono text-muted">${digestShort}</td>
           <td class="mono hide-mobile">${img.size ? formatBytes(img.size) : '\u2014'}</td>
-          <td class="hide-mobile">${timeAgo(img.created)}</td>
+          <td class="hide-mobile">${timeAgo(img.pushed || img.created)}</td>
           <td>${img.platform ? `<span class="platform-badge">${esc(img.platform)}</span>` : '\u2014'}</td>
           <td><button class="btn-sm btn-danger" onclick="event.stopPropagation();confirmDelete('${esc(name)}','${esc(img.digest)}')">Delete</button></td>
         </tr>`;
@@ -707,7 +709,7 @@ async function renderRepoDetail(name) {
       </div>
       <table class="data-table"><thead><tr>
         <th>Tags</th><th>Digest</th><th class="hide-mobile">Size</th>
-        <th class="hide-mobile">Created</th><th>Platform</th><th>Actions</th>
+        <th class="hide-mobile">Pushed</th><th>Platform</th><th>Actions</th>
       </tr></thead><tbody>${rows}</tbody></table>`;
 
     app.innerHTML = pageShell(crumbs, content);
@@ -730,7 +732,7 @@ async function renderImageDetail(name, digest) {
 
   try {
     const host = await getPullHost();
-    const { manifest } = await fetchManifest(name, digest);
+    const { manifest, pushed } = await fetchManifest(name, digest);
     const isManifestList = !!manifest.manifests;
     const isV1 = manifest.schemaVersion === 1 || !!manifest.fsLayers;
 
@@ -789,6 +791,10 @@ async function renderImageDetail(name, digest) {
             <div class="detail-label">Media Type</div>
             <div class="detail-value mono">${esc(manifest.mediaType || 'unknown')}</div>
           </div>
+          ${pushed ? `<div class="detail-card">
+            <div class="detail-label">Pushed</div>
+            <div class="detail-value mono" title="${esc(pushed)}">${timeAgo(pushed)}</div>
+          </div>` : ''}
         </div>
         <div class="detail-section">
           <div class="detail-section-title">Platforms</div>
@@ -897,6 +903,10 @@ async function renderImageDetail(name, digest) {
           <div class="detail-label">Total Size</div>
           <div class="detail-value mono">${formatBytes(totalSize)}</div>
         </div>
+        ${pushed ? `<div class="detail-card">
+          <div class="detail-label">Pushed</div>
+          <div class="detail-value mono" title="${esc(pushed)}">${timeAgo(pushed)}</div>
+        </div>` : ''}
       </div>
       ${configHTML}
       ${layers.length ? `<div class="detail-section">
